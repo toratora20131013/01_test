@@ -12,7 +12,7 @@ from botocore.exceptions import NoCredentialsError, ClientError, ProfileNotFound
 AVAILABLE_MODELS = {
     "Anthropic Claude 3 Sonnet": "anthropic.claude-3-sonnet-20240229-v1:0",
     "Anthropic Claude 3 Haiku": "anthropic.claude-3-haiku-20240307-v1:0",
-    "Anthropic Claude 3 Opus": "anthropic.claude-3-opus-20240229-v1:0", # Opus追加例
+    "Anthropic Claude 3 Opus": "anthropic.claude-3-opus-20240229-v1:0",
     "Amazon Titan Text G1 - Express": "amazon.titan-text-express-v1",
     "Meta Llama 3 8B Instruct": "meta.llama3-8b-instruct-v1:0",
     "Cohere Command R": "cohere.command-r-v1:0",
@@ -49,8 +49,6 @@ if "search_url_history" not in st.session_state:
 def on_settings_change():
     if "agent_executor" in st.session_state:
         del st.session_state.agent_executor
-    # LLMやToolsのキャッシュもクリアしたい場合は、get_llm.clear() なども検討するが、
-    # 通常は引数が変われば @st.cache_resource が再実行されるので不要。
 
 # --- LangChainのコアコンポーネントの初期化 ---
 @st.cache_resource
@@ -59,20 +57,17 @@ def get_llm(model_id: str, max_tokens_from_ui: int, temperature_from_ui: float, 
         model_kwargs = {}
         if "anthropic.claude" in model_id:
             model_kwargs["max_tokens_to_sample"] = max_tokens_from_ui
-            # Claudeの場合、temperatureはChatBedrockのコンストラクタ引数で設定
         elif "amazon.titan" in model_id:
             model_kwargs["textGenerationConfig"] = {
                 "maxTokenCount": max_tokens_from_ui,
-                "temperature": temperature_from_ui, # Titanはここで温度設定
+                "temperature": temperature_from_ui,
                 "stopSequences": [],
                 "topP": 1.0,
             }
         elif "meta.llama" in model_id:
             model_kwargs["max_gen_len"] = max_tokens_from_ui
-            # Llamaの場合、temperatureはChatBedrockのコンストラクタ引数で設定
         elif "cohere.command-r" in model_id:
             model_kwargs["max_tokens"] = max_tokens_from_ui
-            # Cohereの場合、temperatureはChatBedrockのコンストラクタ引数で設定
         else:
             st.warning(f"モデル {model_id} のための特定の `max_tokens` キーが不明です。デフォルト設定を試みますが、動作しない可能性があります。")
 
@@ -130,7 +125,7 @@ def get_agent_executor(llm, tools):
         st.session_state.agent_executor = AgentExecutor(
             agent=agent,
             tools=tools,
-            verbose=True,  # ここを修正 (True または False に固定)
+            verbose=True,  # デバッグ用にTrueに固定 (st.secretsエラー回避)
             handle_parsing_errors=True,
             return_intermediate_steps=True
         )
@@ -147,18 +142,17 @@ with st.sidebar:
     common_aws_regions = [
         "us-east-1", "us-west-2", "ap-northeast-1", "ap-southeast-1", 
         "eu-central-1", "eu-west-1", "eu-west-2", "ap-south-1", 
-        "ca-central-1", "sa-east-1" # さらにリージョン追加
+        "ca-central-1", "sa-east-1"
     ]
     try:
         default_region_index = common_aws_regions.index(st.session_state.selected_aws_region)
-    except ValueError: # 保存されたリージョンがリストにない場合
-        st.session_state.selected_aws_region = DEFAULT_AWS_REGION # デフォルトに戻す
+    except ValueError:
+        st.session_state.selected_aws_region = DEFAULT_AWS_REGION
         try:
             default_region_index = common_aws_regions.index(st.session_state.selected_aws_region)
-        except ValueError: # デフォルトリージョンもリストにない極端なケース
+        except ValueError:
              default_region_index = 0
              st.session_state.selected_aws_region = common_aws_regions[0]
-
 
     selected_region_name = st.selectbox(
         "AWS リージョン:",
@@ -170,6 +164,10 @@ with st.sidebar:
     st.session_state.selected_aws_region = selected_region_name
 
     current_model_display_name = DEFAULT_MODEL_DISPLAY_NAME
+    # セッションステートに保存されたモデル名がAVAILABLE_MODELSに存在するか確認
+    if st.session_state.selected_model_name not in AVAILABLE_MODELS.values():
+        st.session_state.selected_model_name = DEFAULT_MODEL_API_NAME # 存在しなければデフォルトに戻す
+
     for display_name, api_name in AVAILABLE_MODELS.items():
         if api_name == st.session_state.selected_model_name:
             current_model_display_name = display_name
@@ -187,7 +185,7 @@ with st.sidebar:
     st.session_state.selected_max_tokens = st.number_input(
         "最大出力トークン数:",
         min_value=256,
-        max_value=400000, # Claude 3 Opus は 200K context, Llama3は8Kなど。かなり幅がある。
+        max_value=400000,
         value=st.session_state.selected_max_tokens,
         step=128,
         on_change=on_settings_change,
@@ -197,7 +195,7 @@ with st.sidebar:
     st.session_state.selected_temperature = st.slider(
         "Temperature (出力の多様性):",
         min_value=0.0,
-        max_value=1.0, # Titanなどは2.0までいけるが、一般的には1.0が上限
+        max_value=1.0,
         value=st.session_state.selected_temperature,
         step=0.05,
         on_change=on_settings_change,
@@ -268,7 +266,12 @@ current_llm = get_llm(
 current_tools = get_tools(st.session_state.use_duckduckgo)
 agent_executor = get_agent_executor(current_llm, current_tools)
 
-caption_model_display_name = [k for k, v in AVAILABLE_MODELS.items() if v == st.session_state.selected_model_name][0]
+caption_model_display_name = DEFAULT_MODEL_DISPLAY_NAME # デフォルトを設定
+for k, v in AVAILABLE_MODELS.items(): # セッションステートから正しい表示名を取得
+    if v == st.session_state.selected_model_name:
+        caption_model_display_name = k
+        break
+
 st.caption(f"LLM: Bedrock ({caption_model_display_name} in {st.session_state.selected_aws_region}), Search: DuckDuckGo ({'ON' if st.session_state.use_duckduckgo else 'OFF'})")
 
 for message in st.session_state.messages:
@@ -291,7 +294,6 @@ if user_prompt := st.chat_input("メッセージを入力してください...")
                     }
                 )
                 
-                # --- Bedrock Claude 3などのコンテンツブロック形式の応答を処理 ---
                 ai_response_raw = response_data.get('output', "申し訳ありません、応答を取得できませんでした。")
                 final_ai_response = ""
 
@@ -307,7 +309,6 @@ if user_prompt := st.chat_input("メッセージを入力してください...")
                     if all_items_are_valid_text_blocks and text_parts:
                         final_ai_response = "".join(text_parts)
                     else:
-                        # 期待するコンテンツブロック形式ではないリストの場合、文字列として結合
                         st.warning(f"AIからの応答が予期せぬリスト形式でした。文字列として結合します: {ai_response_raw}")
                         final_ai_response = " ".join(map(str, ai_response_raw))
                 elif isinstance(ai_response_raw, str):
@@ -317,30 +318,38 @@ if user_prompt := st.chat_input("メッセージを入力してください...")
                 else:
                     st.warning(f"AIからの応答が予期せぬ型でした: {type(ai_response_raw)}")
                     final_ai_response = str(ai_response_raw)
-
                 ai_response = final_ai_response
-                # --- 処理ここまで ---
 
                 intermediate_steps = response_data.get('intermediate_steps', [])
-
                 urls_found_this_turn = []
+
                 if st.session_state.use_duckduckgo:
                     for step in intermediate_steps:
                         action, observation = step
                         if hasattr(action, 'tool') and action.tool == "duckduckgo_results_json":
-                            if isinstance(observation, str):
-                                try:
-                                    results_list = json.loads(observation)
-                                    for res_item in results_list:
-                                        if isinstance(res_item, dict) and "link" in res_item:
-                                            urls_found_this_turn.append(res_item["link"])
-                                except json.JSONDecodeError:
-                                    st.warning(f"検索結果のJSON解析に失敗しました: {observation[:200]}...")
-                            elif isinstance(observation, list):
+                            processed_successfully = False
+                            if isinstance(observation, list):
                                 for res_item in observation:
                                     if isinstance(res_item, dict) and "link" in res_item:
                                         urls_found_this_turn.append(res_item["link"])
-
+                                processed_successfully = True
+                            elif isinstance(observation, str):
+                                try:
+                                    parsed_observation = json.loads(observation)
+                                    if isinstance(parsed_observation, list):
+                                        for res_item in parsed_observation:
+                                            if isinstance(res_item, dict) and "link" in res_item:
+                                                urls_found_this_turn.append(res_item["link"])
+                                        processed_successfully = True
+                                    else:
+                                        st.warning(f"検索結果をJSONとしてパースできましたが、期待するリスト形式ではありませんでした: {type(parsed_observation)}")
+                                except json.JSONDecodeError as e:
+                                    st.warning(f"検索結果の文字列をJSONとして解析できませんでした。エラー: {e}")
+                                    st.text_area("解析に失敗した文字列 (先頭500文字)", value=observation[:500], height=100, disabled=True)
+                            
+                            if not processed_successfully and not isinstance(observation, (list, str)):
+                                st.warning(f"検索結果が予期しない形式で返されました (型: {type(observation)}): {str(observation)[:200]}...")
+                
                 for url in urls_found_this_turn:
                     if url not in st.session_state.search_url_history:
                         st.session_state.search_url_history.append(url)
@@ -353,4 +362,5 @@ if user_prompt := st.chat_input("メッセージを入力してください...")
         except Exception as e:
             error_message = f"処理中にエラーが発生しました: {str(e)}"
             st.error(error_message)
-            st.session_state.messages.append({"role": "assistant", "content": error_message})
+            # エラー時もメッセージリストにエラー内容を追加する（任意）
+            # st.session_state.messages.append({"role": "assistant", "content": error_message})
