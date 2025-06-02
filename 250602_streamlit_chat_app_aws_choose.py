@@ -130,8 +130,8 @@ def get_agent_executor(llm, tools):
         st.session_state.agent_executor = AgentExecutor(
             agent=agent,
             tools=tools,
-            verbose=st.secrets.get("LANGCHAIN_VERBOSE", False), # verboseをsecretsから制御する例
-            handle_parsing_errors=True, # エラー発生時も処理を継続しようと試みる
+            verbose=True,  # ここを修正 (True または False に固定)
+            handle_parsing_errors=True,
             return_intermediate_steps=True
         )
     return st.session_state.agent_executor
