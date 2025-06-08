@@ -58,12 +58,47 @@ st.markdown("""
 def init_bedrock_client():
     """AWS Bedrockクライアントを初期化"""
     try:
-        return boto3.client(
-            'bedrock-runtime',
-            region_name=st.secrets.get("AWS_REGION", "us-east-1")
-        )
+        import os
+        
+        # 環境変数からAWS設定を取得
+        aws_region = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "us-east-1"))
+        aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
+        aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+        aws_session_token = os.getenv("AWS_SESSION_TOKEN")  # 一時的な認証情報用
+        
+        # 認証情報が環境変数にない場合はデフォルトプロファイルを使用
+        if aws_access_key_id and aws_secret_access_key:
+            client = boto3.client(
+                'bedrock-runtime',
+                region_name=aws_region,
+                aws_access_key_id=aws_access_key_id,
+                aws_secret_access_key=aws_secret_access_key,
+                aws_session_token=aws_session_token  # None でも問題なし
+            )
+        else:
+            # デフォルトのクレデンシャルチェーン（~/.aws/credentials, EC2ロールなど）を使用
+            client = boto3.client(
+                'bedrock-runtime',
+                region_name=aws_region
+            )
+        
+        # 接続テスト（実際にはBedrockの場合は直接テストが難しいため、クライアント作成のみ）
+        return client
+        
     except Exception as e:
         st.error(f"AWS Bedrock クライアントの初期化に失敗しました: {str(e)}")
+        st.error("以下の方法でAWS認証情報を設定してください：")
+        st.code("""
+# 方法1: 環境変数で設定
+export AWS_ACCESS_KEY_ID=your_access_key
+export AWS_SECRET_ACCESS_KEY=your_secret_key
+export AWS_REGION=us-east-1
+
+# 方法2: AWS CLIで設定
+aws configure
+
+# 方法3: EC2/ECS等でIAMロールを使用
+        """)
         return None
 
 # 利用可能なモデル一覧
@@ -169,6 +204,36 @@ def display_chat_message(role: str, content: str):
 def main():
     st.title("🤖 Bedrock ChatBot")
     st.markdown("AWS Bedrockを使用したチャットボットアプリです")
+    
+    # AWS認証情報のヘルプ表示
+    import os
+    if not any([
+        os.getenv("AWS_ACCESS_KEY_ID"),
+        os.path.exists(os.path.expanduser("~/.aws/credentials"))
+    ]):
+        st.warning("⚠️ AWS認証情報が設定されていない可能性があります。")
+        with st.expander("AWS認証情報の設定方法"):
+            st.markdown("""
+            **方法1: 環境変数で設定**
+            ```bash
+            export AWS_ACCESS_KEY_ID=your_access_key_id
+            export AWS_SECRET_ACCESS_KEY=your_secret_access_key
+            export AWS_REGION=us-east-1
+            ```
+            
+            **方法2: AWS CLIで設定**
+            ```bash
+            aws configure
+            ```
+            
+            **方法3: ~/.aws/credentials ファイル**
+            ```ini
+            [default]
+            aws_access_key_id = your_access_key_id
+            aws_secret_access_key = your_secret_access_key
+            region = us-east-1
+            ```
+            """)
     
     # Bedrockクライアントの初期化
     bedrock_client = init_bedrock_client()
