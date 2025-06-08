@@ -1,0 +1,91 @@
+@startuml
+left to right direction
+skinparam defaultFontName "Yu Gothic"
+skinparam rectangle {
+    BorderColor Firebrick
+    ArrowColor Firebrick
+    FontColor Black
+}
+skinparam arrow {
+    Color Firebrick
+    Thickness 1.5
+}
+skinparam package {
+    BorderColor RoyalBlue
+    BackgroundColor #AliceBlue;line:RoyalBlue
+    FontColor Black
+    stereotype<<MS>> {
+        BackgroundColor LightBlue
+    }
+    stereotype<<OP>> {
+        BackgroundColor LightGreen
+    }
+    stereotype<<ES>> {
+        BackgroundColor LightYellow
+    }
+}
+
+' 中心テーマ: エンジンの焼き付き
+rectangle "エンジンの焼き付き\n(金属の溶着・固着)" as Engine_Seizure #LightCoral;line:Firebrick;line.bold
+
+' カテゴリごとの要素定義
+package "材料・構造 (MS)" <<MS>> {
+    rectangle "エンジンオイルの種類・品質\n(粘度, 添加剤, ベースオイル)" as MS_OilQuality
+    rectangle "ピストンとシリンダー\n(材質, 表面処理, クリアランス)" as MS_PistonClearance
+    rectangle "冷却システムの構造・容量\n(ラジエーター, ウォーターポンプ)" as MS_CoolingSystem
+    rectangle "オイルポンプ・フィルターの性能" as MS_OilPump
+}
+
+package "運用・メンテナンス (OP)" <<OP>> {
+    rectangle "オイル交換頻度・管理状態\n(走行距離, 期間, オイル量)" as OP_OilChange
+    rectangle "高負荷運転の頻度\n(サーキット走行, 登坂, 急加速)" as OP_HighLoad
+    rectangle "冷却水の量・劣化状態の管理" as OP_CoolantMaint
+    rectangle "不適切な運転操作\n(ウォームアップ不足, 長時間アイドリング)" as OP_DrivingStyle
+}
+
+package "エンジンの特性・状態 (ES)" <<ES>> {
+    rectangle "オイルの劣化・汚染\n(酸化, スラッジ, 金属粉混入)" as ES_OilDegradation
+    rectangle "油圧低下" as ES_LowOilPressure
+    rectangle "オーバーヒート\n(冷却能力の低下)" as ES_Overheat
+    rectangle "油膜切れ\n(潤滑不良)" as ES_OilFilmBreak
+    rectangle "異常摩耗・金属粉の発生" as ES_AbnormalWear
+    rectangle "局所的な摩擦熱の増大\n(金属接触)" as ES_LocalHeating
+}
+
+' --- 関係性の定義 ---
+
+' 材料・構造 (MS) が エンジンの状態 (ES) に影響
+MS_OilQuality --> ES_OilFilmBreak : オイルの性能不足は高負荷時に油膜切れを招く
+MS_PistonClearance --> ES_AbnormalWear : 不適切なクリアランスは異常摩耗の原因となる
+MS_CoolingSystem --> ES_Overheat : 冷却能力不足はオーバーヒートに直結する
+MS_OilPump -> ES_LowOilPressure : ポンプの不調やフィルター詰まりが油圧を低下させる
+
+' 運用・メンテナンス (OP) が エンジンの状態 (ES) に影響
+OP_OilChange --> ES_OilDegradation : メンテナンス不良はオイルの劣化を加速させる
+OP_OilChange --> ES_LowOilPressure : オイル量不足は油圧低下を招く
+OP_HighLoad --> ES_Overheat : 高負荷運転はエンジン全体の温度を上昇させる
+OP_HighLoad --> ES_OilFilmBreak : 過大な熱と圧力は油膜を破壊する
+OP_CoolantMaint --> ES_Overheat : 冷却水が不足・劣化すると冷却性能が著しく低下する
+OP_DrivingStyle --> ES_OilFilmBreak : 急な負荷変動は潤滑が追いつかず油膜切れを誘発
+
+' エンジンの状態 (ES) 内の連関
+ES_OilDegradation --> ES_OilFilmBreak : 劣化したオイルは正常な油膜を維持できない
+ES_LowOilPressure --> ES_OilFilmBreak : 油圧が低いと各部に十分なオイルが行き渡らない
+ES_Overheat --> ES_OilFilmBreak : 高温はオイル粘度を低下させ、油膜切れを誘発する
+ES_AbnormalWear --> ES_OilDegradation : 発生した金属粉がオイルを汚染し、劣化を促進する
+
+' 焼き付きへのコアメカニズム (正のフィードバックループ)
+ES_OilFilmBreak --> ES_LocalHeating : **油膜切れによる金属接触が摩擦熱を急激に増大させる**
+ES_LocalHeating --> Engine_Seizure : **摩擦熱がピストンやシリンダーを溶融させ、溶着・固着に至る**
+Engine_Seizure --> ES_LocalHeating : **固着部の拡大が更なる摩擦熱を発生させ、焼き付きが瞬時に進行・拡大する (熱暴走)**
+
+note right of Engine_Seizure
+  <b>凡例</b>
+  <color:Firebrick>Engine_Seizure</color>: 中心テーマ (エンジンの焼き付き)
+  パッケージ色:
+    <color:LightBlue>■</color> 材料・構造 (MS)
+    <color:LightGreen>■</color> 運用・メンテナンス (OP)
+    <color:LightYellow>■</color> エンジンの特性・状態 (ES)
+end note
+
+@enduml
