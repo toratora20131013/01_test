@@ -181,25 +181,594 @@ def display_chat_message(role: str, content: str):
         </div>
         """, unsafe_allow_html=True)
         
-        # メッセージ内容の処理
-        formatted_content, code_blocks = format_message_content(content)
-        
-        if code_blocks:
-            # コードブロックがある場合
-            parts = formatted_content.split("__CODE_BLOCK_")
-            st.markdown(parts[0])
+        # アシスタントの回答の場合、表示モード切り替えを追加
+        if role == "assistant":
+            col1, col2, col3 = st.columns([1, 1, 4])
+            with col1:
+                view_mode = st.radio(
+                    "表示モード", 
+                    ["レンダリング", "Raw"], 
+                    key=f"view_mode_{hash(content)}",
+                    horizontal=True
+                )
+            with col2:
+                if st.button("📋 コピー", key=f"copy_{hash(content)}", help="Raw形式でクリップボードにコピー"):
+                    # JavaScriptでクリップボードにコピー
+                    st.components.v1.html(f"""
+                    <script>
+                        navigator.clipboard.writeText(`{content.replace('`', '\\`').replace('
+
+def main():
+    st.title("🤖 Bedrock ChatBot")
+    st.markdown("AWS Bedrockを使用したチャットボットアプリです")
+    
+    # AWS認証情報のヘルプ表示
+    import os
+    if not any([
+        os.getenv("AWS_ACCESS_KEY_ID"),
+        os.path.exists(os.path.expanduser("~/.aws/credentials"))
+    ]):
+        st.warning("⚠️ AWS認証情報が設定されていない可能性があります。")
+        with st.expander("AWS認証情報の設定方法"):
+            st.markdown("""
+            **方法1: 環境変数で設定**
+            ```bash
+            export AWS_ACCESS_KEY_ID=your_access_key_id
+            export AWS_SECRET_ACCESS_KEY=your_secret_access_key
+            export AWS_REGION=us-east-1
+            ```
             
-            for i, (lang, code) in enumerate(code_blocks):
-                if i + 1 < len(parts):
-                    # コードブロックを表示
-                    st.code(code, language=lang if lang else None)
-                    # コードブロック後のテキストを表示
-                    remaining_text = parts[i + 1].replace(f"{lang}__", "")
-                    if remaining_text.strip():
-                        st.markdown(remaining_text)
+            **方法2: AWS CLIで設定**
+            ```bash
+            aws configure
+            ```
+            
+            **方法3: ~/.aws/credentials ファイル**
+            ```ini
+            [default]
+            aws_access_key_id = your_access_key_id
+            aws_secret_access_key = your_secret_access_key
+            region = us-east-1
+            ```
+            """)
+    
+    # Bedrockクライアントの初期化
+    bedrock_client = init_bedrock_client()
+    if not bedrock_client:
+        st.stop()
+    
+    # サイドバーでの設定
+    with st.sidebar:
+        st.header("⚙️ 設定")
+        
+        # モデル選択
+        selected_model_name = st.selectbox(
+            "LLMモデルを選択",
+            options=list(AVAILABLE_MODELS.keys()),
+            index=0
+        )
+        selected_model_id = AVAILABLE_MODELS[selected_model_name]
+        
+        # Temperature設定
+        temperature = st.slider(
+            "Temperature",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.7,
+            step=0.1,
+            help="値が高いほど創造的な回答になります"
+        )
+        
+        # 最大トークン数設定
+        max_tokens = st.slider(
+            "最大出力トークン数",
+            min_value=100,
+            max_value=4000,
+            value=1000,
+            step=100,
+            help="生成される回答の最大長を制御します"
+        )
+        
+        # 設定情報の表示
+        st.info(f"""
+        **現在の設定:**
+        - モデル: {selected_model_name}
+        - Temperature: {temperature}
+        - 最大トークン: {max_tokens}
+        """)
+        
+        # チャット履歴をクリア
+        if st.button("🗑️ チャット履歴をクリア", type="secondary"):
+            st.session_state.messages = []
+            st.rerun()
+    
+    # セッション状態の初期化
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    
+    # チャット履歴の表示
+    for message in st.session_state.messages:
+        display_chat_message(message["role"], message["content"])
+    
+    # ユーザー入力
+    if prompt := st.chat_input("メッセージを入力してください..."):
+        # ユーザーメッセージを追加
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        display_chat_message("user", prompt)
+        
+        # アシスタントの応答を生成
+        with st.spinner("回答を生成中..."):
+            # Bedrock用のメッセージ形式に変換
+            bedrock_messages = []
+            for msg in st.session_state.messages:
+                bedrock_messages.append({
+                    "role": msg["role"],
+                    "content": msg["content"]
+                })
+            
+            # モデルを呼び出し
+            response = invoke_bedrock_model(
+                bedrock_client,
+                selected_model_id,
+                bedrock_messages,
+                temperature,
+                max_tokens
+            )
+        
+        # アシスタントの応答を追加
+        st.session_state.messages.append({"role": "assistant", "content": response})
+        display_chat_message("assistant", response)
+        
+        st.rerun()
+    
+    # フッター
+    st.markdown("---")
+    st.markdown(
+        "💡 **Tips:** コードやMarkdownの内容は自動的にフォーマットされ、コピーしやすく表示されます。"
+    )
+
+if __name__ == "__main__":
+    main()
+, '\\
+
+def main():
+    st.title("🤖 Bedrock ChatBot")
+    st.markdown("AWS Bedrockを使用したチャットボットアプリです")
+    
+    # AWS認証情報のヘルプ表示
+    import os
+    if not any([
+        os.getenv("AWS_ACCESS_KEY_ID"),
+        os.path.exists(os.path.expanduser("~/.aws/credentials"))
+    ]):
+        st.warning("⚠️ AWS認証情報が設定されていない可能性があります。")
+        with st.expander("AWS認証情報の設定方法"):
+            st.markdown("""
+            **方法1: 環境変数で設定**
+            ```bash
+            export AWS_ACCESS_KEY_ID=your_access_key_id
+            export AWS_SECRET_ACCESS_KEY=your_secret_access_key
+            export AWS_REGION=us-east-1
+            ```
+            
+            **方法2: AWS CLIで設定**
+            ```bash
+            aws configure
+            ```
+            
+            **方法3: ~/.aws/credentials ファイル**
+            ```ini
+            [default]
+            aws_access_key_id = your_access_key_id
+            aws_secret_access_key = your_secret_access_key
+            region = us-east-1
+            ```
+            """)
+    
+    # Bedrockクライアントの初期化
+    bedrock_client = init_bedrock_client()
+    if not bedrock_client:
+        st.stop()
+    
+    # サイドバーでの設定
+    with st.sidebar:
+        st.header("⚙️ 設定")
+        
+        # モデル選択
+        selected_model_name = st.selectbox(
+            "LLMモデルを選択",
+            options=list(AVAILABLE_MODELS.keys()),
+            index=0
+        )
+        selected_model_id = AVAILABLE_MODELS[selected_model_name]
+        
+        # Temperature設定
+        temperature = st.slider(
+            "Temperature",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.7,
+            step=0.1,
+            help="値が高いほど創造的な回答になります"
+        )
+        
+        # 最大トークン数設定
+        max_tokens = st.slider(
+            "最大出力トークン数",
+            min_value=100,
+            max_value=4000,
+            value=1000,
+            step=100,
+            help="生成される回答の最大長を制御します"
+        )
+        
+        # 設定情報の表示
+        st.info(f"""
+        **現在の設定:**
+        - モデル: {selected_model_name}
+        - Temperature: {temperature}
+        - 最大トークン: {max_tokens}
+        """)
+        
+        # チャット履歴をクリア
+        if st.button("🗑️ チャット履歴をクリア", type="secondary"):
+            st.session_state.messages = []
+            st.rerun()
+    
+    # セッション状態の初期化
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    
+    # チャット履歴の表示
+    for message in st.session_state.messages:
+        display_chat_message(message["role"], message["content"])
+    
+    # ユーザー入力
+    if prompt := st.chat_input("メッセージを入力してください..."):
+        # ユーザーメッセージを追加
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        display_chat_message("user", prompt)
+        
+        # アシスタントの応答を生成
+        with st.spinner("回答を生成中..."):
+            # Bedrock用のメッセージ形式に変換
+            bedrock_messages = []
+            for msg in st.session_state.messages:
+                bedrock_messages.append({
+                    "role": msg["role"],
+                    "content": msg["content"]
+                })
+            
+            # モデルを呼び出し
+            response = invoke_bedrock_model(
+                bedrock_client,
+                selected_model_id,
+                bedrock_messages,
+                temperature,
+                max_tokens
+            )
+        
+        # アシスタントの応答を追加
+        st.session_state.messages.append({"role": "assistant", "content": response})
+        display_chat_message("assistant", response)
+        
+        st.rerun()
+    
+    # フッター
+    st.markdown("---")
+    st.markdown(
+        "💡 **Tips:** コードやMarkdownの内容は自動的にフォーマットされ、コピーしやすく表示されます。"
+    )
+
+if __name__ == "__main__":
+    main()
+)}`);
+                        alert('コピーしました！');
+                    </script>
+                    """, height=0)
+        
+        # メッセージ内容の処理と表示
+        if role == "assistant" and 'view_mode' in locals() and view_mode == "Raw":
+            # Raw Markdownを表示（コピー可能）
+            st.code(content, language="markdown")
         else:
-            # 通常のマークダウン表示
-            st.markdown(content)
+            # レンダリング表示
+            formatted_content, code_blocks = format_message_content(content)
+            
+            if code_blocks:
+                # コードブロックがある場合
+                parts = formatted_content.split("__CODE_BLOCK_")
+                if parts[0].strip():
+                    st.markdown(parts[0])
+                
+                for i, (lang, code) in enumerate(code_blocks):
+                    # コードブロックを表示
+                    col1, col2 = st.columns([5, 1])
+                    with col1:
+                        st.code(code, language=lang if lang else None)
+                    with col2:
+                        if st.button("📋", key=f"copy_code_{hash(code)}_{i}", help="コードをコピー"):
+                            st.components.v1.html(f"""
+                            <script>
+                                navigator.clipboard.writeText(`{code.replace('`', '\\`').replace('
+
+def main():
+    st.title("🤖 Bedrock ChatBot")
+    st.markdown("AWS Bedrockを使用したチャットボットアプリです")
+    
+    # AWS認証情報のヘルプ表示
+    import os
+    if not any([
+        os.getenv("AWS_ACCESS_KEY_ID"),
+        os.path.exists(os.path.expanduser("~/.aws/credentials"))
+    ]):
+        st.warning("⚠️ AWS認証情報が設定されていない可能性があります。")
+        with st.expander("AWS認証情報の設定方法"):
+            st.markdown("""
+            **方法1: 環境変数で設定**
+            ```bash
+            export AWS_ACCESS_KEY_ID=your_access_key_id
+            export AWS_SECRET_ACCESS_KEY=your_secret_access_key
+            export AWS_REGION=us-east-1
+            ```
+            
+            **方法2: AWS CLIで設定**
+            ```bash
+            aws configure
+            ```
+            
+            **方法3: ~/.aws/credentials ファイル**
+            ```ini
+            [default]
+            aws_access_key_id = your_access_key_id
+            aws_secret_access_key = your_secret_access_key
+            region = us-east-1
+            ```
+            """)
+    
+    # Bedrockクライアントの初期化
+    bedrock_client = init_bedrock_client()
+    if not bedrock_client:
+        st.stop()
+    
+    # サイドバーでの設定
+    with st.sidebar:
+        st.header("⚙️ 設定")
+        
+        # モデル選択
+        selected_model_name = st.selectbox(
+            "LLMモデルを選択",
+            options=list(AVAILABLE_MODELS.keys()),
+            index=0
+        )
+        selected_model_id = AVAILABLE_MODELS[selected_model_name]
+        
+        # Temperature設定
+        temperature = st.slider(
+            "Temperature",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.7,
+            step=0.1,
+            help="値が高いほど創造的な回答になります"
+        )
+        
+        # 最大トークン数設定
+        max_tokens = st.slider(
+            "最大出力トークン数",
+            min_value=100,
+            max_value=4000,
+            value=1000,
+            step=100,
+            help="生成される回答の最大長を制御します"
+        )
+        
+        # 設定情報の表示
+        st.info(f"""
+        **現在の設定:**
+        - モデル: {selected_model_name}
+        - Temperature: {temperature}
+        - 最大トークン: {max_tokens}
+        """)
+        
+        # チャット履歴をクリア
+        if st.button("🗑️ チャット履歴をクリア", type="secondary"):
+            st.session_state.messages = []
+            st.rerun()
+    
+    # セッション状態の初期化
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    
+    # チャット履歴の表示
+    for message in st.session_state.messages:
+        display_chat_message(message["role"], message["content"])
+    
+    # ユーザー入力
+    if prompt := st.chat_input("メッセージを入力してください..."):
+        # ユーザーメッセージを追加
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        display_chat_message("user", prompt)
+        
+        # アシスタントの応答を生成
+        with st.spinner("回答を生成中..."):
+            # Bedrock用のメッセージ形式に変換
+            bedrock_messages = []
+            for msg in st.session_state.messages:
+                bedrock_messages.append({
+                    "role": msg["role"],
+                    "content": msg["content"]
+                })
+            
+            # モデルを呼び出し
+            response = invoke_bedrock_model(
+                bedrock_client,
+                selected_model_id,
+                bedrock_messages,
+                temperature,
+                max_tokens
+            )
+        
+        # アシスタントの応答を追加
+        st.session_state.messages.append({"role": "assistant", "content": response})
+        display_chat_message("assistant", response)
+        
+        st.rerun()
+    
+    # フッター
+    st.markdown("---")
+    st.markdown(
+        "💡 **Tips:** コードやMarkdownの内容は自動的にフォーマットされ、コピーしやすく表示されます。"
+    )
+
+if __name__ == "__main__":
+    main()
+, '\\
+
+def main():
+    st.title("🤖 Bedrock ChatBot")
+    st.markdown("AWS Bedrockを使用したチャットボットアプリです")
+    
+    # AWS認証情報のヘルプ表示
+    import os
+    if not any([
+        os.getenv("AWS_ACCESS_KEY_ID"),
+        os.path.exists(os.path.expanduser("~/.aws/credentials"))
+    ]):
+        st.warning("⚠️ AWS認証情報が設定されていない可能性があります。")
+        with st.expander("AWS認証情報の設定方法"):
+            st.markdown("""
+            **方法1: 環境変数で設定**
+            ```bash
+            export AWS_ACCESS_KEY_ID=your_access_key_id
+            export AWS_SECRET_ACCESS_KEY=your_secret_access_key
+            export AWS_REGION=us-east-1
+            ```
+            
+            **方法2: AWS CLIで設定**
+            ```bash
+            aws configure
+            ```
+            
+            **方法3: ~/.aws/credentials ファイル**
+            ```ini
+            [default]
+            aws_access_key_id = your_access_key_id
+            aws_secret_access_key = your_secret_access_key
+            region = us-east-1
+            ```
+            """)
+    
+    # Bedrockクライアントの初期化
+    bedrock_client = init_bedrock_client()
+    if not bedrock_client:
+        st.stop()
+    
+    # サイドバーでの設定
+    with st.sidebar:
+        st.header("⚙️ 設定")
+        
+        # モデル選択
+        selected_model_name = st.selectbox(
+            "LLMモデルを選択",
+            options=list(AVAILABLE_MODELS.keys()),
+            index=0
+        )
+        selected_model_id = AVAILABLE_MODELS[selected_model_name]
+        
+        # Temperature設定
+        temperature = st.slider(
+            "Temperature",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.7,
+            step=0.1,
+            help="値が高いほど創造的な回答になります"
+        )
+        
+        # 最大トークン数設定
+        max_tokens = st.slider(
+            "最大出力トークン数",
+            min_value=100,
+            max_value=4000,
+            value=1000,
+            step=100,
+            help="生成される回答の最大長を制御します"
+        )
+        
+        # 設定情報の表示
+        st.info(f"""
+        **現在の設定:**
+        - モデル: {selected_model_name}
+        - Temperature: {temperature}
+        - 最大トークン: {max_tokens}
+        """)
+        
+        # チャット履歴をクリア
+        if st.button("🗑️ チャット履歴をクリア", type="secondary"):
+            st.session_state.messages = []
+            st.rerun()
+    
+    # セッション状態の初期化
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    
+    # チャット履歴の表示
+    for message in st.session_state.messages:
+        display_chat_message(message["role"], message["content"])
+    
+    # ユーザー入力
+    if prompt := st.chat_input("メッセージを入力してください..."):
+        # ユーザーメッセージを追加
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        display_chat_message("user", prompt)
+        
+        # アシスタントの応答を生成
+        with st.spinner("回答を生成中..."):
+            # Bedrock用のメッセージ形式に変換
+            bedrock_messages = []
+            for msg in st.session_state.messages:
+                bedrock_messages.append({
+                    "role": msg["role"],
+                    "content": msg["content"]
+                })
+            
+            # モデルを呼び出し
+            response = invoke_bedrock_model(
+                bedrock_client,
+                selected_model_id,
+                bedrock_messages,
+                temperature,
+                max_tokens
+            )
+        
+        # アシスタントの応答を追加
+        st.session_state.messages.append({"role": "assistant", "content": response})
+        display_chat_message("assistant", response)
+        
+        st.rerun()
+    
+    # フッター
+    st.markdown("---")
+    st.markdown(
+        "💡 **Tips:** コードやMarkdownの内容は自動的にフォーマットされ、コピーしやすく表示されます。"
+    )
+
+if __name__ == "__main__":
+    main()
+)}`);
+                                alert('コードをコピーしました！');
+                            </script>
+                            """, height=0)
+                    
+                    # コードブロック後のテキストを表示
+                    if i + 1 < len(parts):
+                        remaining_text = parts[i + 1].replace(f"{lang}__", "")
+                        if remaining_text.strip():
+                            st.markdown(remaining_text)
+            else:
+                # 通常のマークダウン表示
+                st.markdown(content)
 
 def main():
     st.title("🤖 Bedrock ChatBot")
